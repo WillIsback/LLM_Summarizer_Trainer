@@ -1,0 +1,3 @@
+wandb
+rouge_score
+evaluate
