@@ -1,0 +1,13 @@
+outputs
+wandb
+**/__pycache__/
+__pycache__
+**/*.pyc
+.env
+.venv
+.snippet.py
+_unsloth_sentencepiece_temp
+_*
+llama.cpp
+!dummy.txt
+logs
