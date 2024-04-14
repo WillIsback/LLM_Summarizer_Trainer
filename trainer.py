@@ -58,9 +58,10 @@ class Unsloth_LLM_Trainer:
             dtype=None,
             load_in_4bit=self.load_in_4bit,
         )
-        chatml = ChatTemplate(self.tokenizer)
+        self.tokenizer.paddding_side = "left"
         if self.tokenizer.pad_token_id is None:
-            self.tokenizer.pad_token_id = self.tokenizer.eos_token_id
+            self.tokenizer.pad_token = self.tokenizer.eos_token
+        chatml = ChatTemplate(self.tokenizer, self.GetChatTemplate_Type())
         # Load your data
         self.dataset_train, self.dataset_val = chatml.load_data()
         test_dataset(self.dataset_train)
@@ -77,6 +78,22 @@ class Unsloth_LLM_Trainer:
         )
         logging.basicConfig(filename="logs/training.log", level=logging.INFO)
 
+    def GetChatTemplate_Type(self):
+        if 'gemma' in self.model_name:
+            return 'gemma_chatml'
+        if 'unsloth' in self.model_name:
+            return 'unsloth'
+        if 'zephyr' in self.model_name:
+            return 'zephyr'
+        if 'mistral' in self.model_name:
+            return 'mistral'
+        if 'alpaca' in self.model_name:
+            return 'alpaca'
+        if 'llama' in self.model_name:
+            return 'llama'
+        else:
+            return 'chatml'
+
     def log_end_of_training(self):
         # Log the values to a local log file
         logging.info(f"Base Model name: {self.model_name}")
@@ -87,40 +104,46 @@ class Unsloth_LLM_Trainer:
         logging.info(f"Weights & Biases run URL: {self.wandb_run_url}")
         logging.info(f"Weights & Biases run path: {self.wandb_run_path}")
 
-    def generate_summary(self, messages):
-        # Check if the model is in training mode
-        if self.model.training:
-            # If it's in training mode, switch it to inference mode
-            FastLanguageModel.for_inference(self.model)
-        # check if the input token length is less than the max_seq_length, if it is set truncation to True
-        truncation = check_token_threshold_and_truncate(
-            self.tokenizer, self.model, messages, self.max_seq_length
-        )
-        # Tokenize the input messages
-        inputs = self.tokenizer.apply_chat_template(
-            messages,
-            tokenize=True,
-            add_generation_prompt=True,  # Must add for generation
-            return_tensors="pt",
-            max_length=self.max_seq_length,
-            truncation=truncation,
-        ).to(device=self.device)
-        # Generate the summary
-        summary_ids = self.model.generate(
-            input_ids=inputs,
-            max_new_tokens=self.max_seq_length,
-            do_sample=True,
-            pad_token_id=self.tokenizer.pad_token_id,
-            temperature=0.3,
-            top_k=20,
-            top_p=0.95,
-            repetition_penalty=1.2,
-        )
-        # Decode the summary
-        summary_text = self.tokenizer.decode(
-            summary_ids[0][inputs.shape[1] :], skip_special_tokens=True
-        )
-        return summary_text
+    def generate_summary(self, messages, temperature=0.7, top_k=20, top_p=0.95, repetition_penalty=1.2):
+        try:
+            # Check if the model is in training mode
+            if self.model.training:
+                # If it's in training mode, switch it to inference mode
+                FastLanguageModel.for_inference(self.model)
+            # check if the input token length is less than the max_seq_length, if it is set truncation to True
+            truncation = check_token_threshold_and_truncate(
+                self.tokenizer, self.model, messages, self.max_seq_length
+            )
+            # Tokenize the input messages
+            inputs = self.tokenizer.apply_chat_template(
+                messages,
+                tokenize=True,
+                add_generation_prompt=True,  # Must add for generation
+                return_tensors="pt",
+                max_length=self.max_seq_length,
+                truncation=truncation,
+            ).to(device=self.device)
+            # Generate the summary
+            summary_ids = self.model.generate(
+                input_ids=inputs,
+                max_new_tokens=self.max_seq_length,
+                do_sample=True,
+                pad_token_id=self.tokenizer.pad_token_id,
+                temperature=temperature,
+                top_k=top_k,
+                top_p=top_p,
+                repetition_penalty=repetition_penalty,
+            )
+            # Decode the summary
+            summary_text = self.tokenizer.decode(
+                summary_ids[0][inputs.shape[1] :], skip_special_tokens=True
+            )
+            return summary_text
+        except RuntimeError as e:
+            print(f"An error occurred during summary generation: {e}")
+            if "probability tensor contains either `inf`, `nan` or element < 0" in str(e):
+                print("Adjusting parameters and retrying...")
+                return self.generate_summary(messages, temperature=temperature+0.1, top_k=top_k+5, top_p=min(1, top_p+0.05), repetition_penalty=max(1, repetition_penalty-0.1))
 
     def GetOutputModelName(self):
         # Get the base name of the model and use it to name the fine-tuned model

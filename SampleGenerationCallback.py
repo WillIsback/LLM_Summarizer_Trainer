@@ -26,15 +26,22 @@ class SampleGenerationCallback(TrainerCallback):
         self.patience_counter = 0
 
     def generate_and_score_summary(self):
-        messages_chat, Reference_summary = self.generate_random_text()
-        summary_text = self.generate_summary(messages_chat)
-        scores = self.rouge.score(Reference_summary, summary_text)
-        rouge1 = scores['rouge1'].fmeasure
-        rouge2 = scores['rouge2'].fmeasure
-        rougeL = scores['rougeL'].fmeasure
-        # Add the scores to the history
-        self.scores_history.append((rouge1, rouge2, rougeL))
-        return summary_text, Reference_summary, rouge1, rouge2, rougeL
+        try:
+            messages_chat, Reference_summary = self.generate_random_text()
+            summary_text = self.generate_summary(messages_chat)
+            if summary_text is None:
+                print("Summary generation failed.")
+                return None, None, None, None, None
+            scores = self.rouge.score(Reference_summary, summary_text)
+            rouge1 = scores['rouge1'].fmeasure
+            rouge2 = scores['rouge2'].fmeasure
+            rougeL = scores['rougeL'].fmeasure
+            # Add the scores to the history
+            self.scores_history.append((rouge1, rouge2, rougeL))
+            return summary_text, Reference_summary, rouge1, rouge2, rougeL
+        except RuntimeError as e:
+            print(f"An error occurred during summary generation: {e}")
+            return None, None, None, None, None
 
     def log_rouge_scores(self, rouge1, rouge2, rougeL):
         # Log the rouge scores one by one
@@ -118,6 +125,9 @@ class SampleGenerationCallback(TrainerCallback):
         # Score the summary metrics at every eval_steps
         if state.global_step % args.eval_steps == 0:
             summary_text, Reference_summary, rouge1, rouge2, rougeL = self.generate_and_score_summary()
+            if summary_text is None:
+                print("Summary generation failed. Skipping this step.")
+                return
             self.log_rouge_scores(rouge1, rouge2, rougeL)
             self.log_summary_table(Reference_summary, summary_text, rouge1, rouge2, rougeL, state)
             moving_avg = self.calculate_and_log_moving_average(state.global_step)

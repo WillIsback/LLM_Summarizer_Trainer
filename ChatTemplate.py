@@ -3,9 +3,9 @@ import pandas as pd
 from unsloth.chat_templates import get_chat_template
 
 class ChatTemplate():
-    def __init__(self, tokenizer):
+    def __init__(self, tokenizer, chat_template):
         self.tokenizer = tokenizer
-
+        self.chat_template = chat_template
     def formating_messages(self,example):
         user_chat = {"role": example["user"]["role"], "content": example["user"]["content"]}
         assistant_chat = {"role": example["assistant"]["role"], "content": example["assistant"]["content"]}
@@ -19,7 +19,7 @@ class ChatTemplate():
     def load_data(self):
         self.tokenizer = get_chat_template(
         self.tokenizer,
-        chat_template = "chatml", # Supports zephyr, chatml, mistral, llama, alpaca, vicuna, vicuna_old, unsloth
+        chat_template = self.chat_template, # Supports zephyr, chatml, mistral, llama, alpaca, vicuna, vicuna_old, unsloth
         mapping = {"role": "role", "content": "content", "user": "user", "assistant": "assistant"}, # ShareGPT style
         map_eos_token = True, # Maps <|im_end|> to </s> instead
         )
