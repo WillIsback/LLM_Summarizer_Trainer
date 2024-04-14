@@ -25,7 +25,7 @@ class ChatTemplate():
         )
         dataset_train = load_dataset("Labagaite/fr-summarizer-dataset", split = "train")
         dataset_val = load_dataset("Labagaite/fr-summarizer-dataset", split = "validation")
-        # Group the data
+        # Group the data to pair the user and assistant messages in a single example
         grouped_data_train = [{"user": dataset_train[i], "assistant": dataset_train[i+1]} for i in range(0, len(dataset_train), 2)]
         grouped_data_val = [{"user": dataset_val[i], "assistant": dataset_val[i+1]} for i in range(0, len(dataset_val), 2)]
         # Convert the list of dictionaries to a DataFrame
@@ -34,7 +34,7 @@ class ChatTemplate():
         # Create a new Dataset object
         dataset_train = Dataset.from_pandas(df_train)
         dataset_val = Dataset.from_pandas(df_val)
-
+        # Apply the formating functions to the datasets
         dataset_train = dataset_train.map(self.formating_messages, batched = False)
         dataset_train = dataset_train.map(self.formatting_prompts_func, batched = True)
         dataset_val = dataset_val.map(self.formating_messages, batched = False)

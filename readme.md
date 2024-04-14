@@ -96,6 +96,11 @@ If you prefer to set up your environment manually or are using a different opera
     - `wandb`: Weights & Biases, a tool for tracking and visualizing machine learning experiments.
     - `rouge_score`: A Python package for calculating the ROUGE (Recall-Oriented Understudy for Gisting Evaluation) score, a common metric for evaluating text summaries.
     - `evaluate`: A package for evaluating machine learning models.
+    - `openai`>=0.14.0
+    - `tiktoken`>=0.0.5
+    - `markdown`>=3.0.0
+    - `matplotlib`>=3.0.0
+    - `IPython`>=8.10
 
 4. **Install additional packages based on your GPU architecture and PyTorch version**: Refer to the `setup.sh` script for the specific packages to install based on your GPU architecture (Ampere or older) and PyTorch version (2.1.0, 2.1.1, 2.2.0, or 2.2.1). You can check your GPU architecture and PyTorch version using the following Python commands:
 

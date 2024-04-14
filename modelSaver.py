@@ -1,8 +1,10 @@
 
-from huggingface_hub import ModelCard
+from huggingface_hub import ModelCard, HfApi
 from dotenv import load_dotenv
 import os
 import wandb
+import matplotlib.pyplot as plt
+import seaborn as sns
 load_dotenv()
 HUGGING_FACE = os.getenv('HUGGING_FACE')
 WANDB_API_KEY = os.getenv('WANDB_API_KEY')
@@ -10,7 +12,7 @@ wandb.login(key=WANDB_API_KEY)
 api = wandb.Api()
 
 class ModelSaver:
-    def __init__(self, model, tokenizer, fine_tuned_model_dir, out_model_name, wandb_run_url, wandb_run_path):
+    def __init__(self, model, tokenizer, fine_tuned_model_dir, out_model_name, wandb_run_url, wandb_run_path, eval_file_path=None, evaluation=''):
         self.model = model
         self.tokenizer = tokenizer
         self.fine_tuned_model_dir = fine_tuned_model_dir
@@ -18,6 +20,8 @@ class ModelSaver:
         self.method = ""
         self.wandb_run_url = wandb_run_url
         self.wandb_run_path = wandb_run_path
+        self.eval_file_path = eval_file_path
+        self.evaluation = evaluation
     def save_model(self):
         print("\nEnter the types of models you want to save. Options are: '16bit', '4bit', 'lora', 'gguf_q8_0', 'gguf_f16', 'gguf_q4_k_m'. Enter 'all' to save all types. Separate multiple options with commas.\n")
         user_input = [x.strip() for x in input().split(',')]
@@ -91,7 +95,7 @@ class ModelSaver:
             self.UpdateModelCard(f"Labagaite/{temp_model_name}", HUGGING_FACE)
 
     def UpdateModelCard(self, save_directory, token):
-        rouge_1_score, rouge_2_score, rougeL_score = self.get_wandb_run()
+        self.get_metrics(save_directory,token)
         content = CUSTOM_MODEL_CARD.format(
             username="Labagaite",
             base_model=self.model.config._name_or_path,
@@ -99,22 +103,39 @@ class ModelSaver:
             method=self.method,
             extra="",
             wandb_run_url=self.wandb_run_url,
-            rouge_1_score=rouge_1_score,
-            rouge_2_score=rouge_2_score,
-            rougeL_score=rougeL_score,
+            eval_file_path = self.eval_file_path,
+            evaluation = self.evaluation
         )
+        if(self.eval_file_path is not None):
+            self.push_files(self.eval_file_path,save_directory,token)
+
         card = ModelCard(content)
         card.push_to_hub(save_directory, token = token)
 
-    def get_wandb_run(self):
+    def get_metrics(self,save_directory,token):
         run = api.run(self.wandb_run_path)
-        # Access the summary metrics
-        rouge_1_score = run.summary.get("ROUGE-1")
-        rouge_2_score = run.summary.get("ROUGE-2")
-        rougeL_score = run.summary.get("ROUGE-L")
-        return rouge_1_score, rouge_2_score, rougeL_score
+        hist = run.history(keys=['train/global_step', 'eval/loss'])
+        # Plot the data
+        plt.figure(figsize=(10, 10))
+        sns.regplot(x='train/global_step', y='eval/loss', data=hist, color='red', lowess=True)
+        plt.title('Evaluation Loss')
+        plt.xlabel('Steps')
+        plt.ylabel('Loss')
+        plt.savefig('eval_loss_plot.png')
+        self.push_files('eval_loss_plot.png', save_directory, token)
 
 
+    def push_files(self,file_path,save_directory,token):
+        hfapi = HfApi()
+        hfapi.upload_file(
+        path_or_fileobj=file_path,
+        path_in_repo=file_path,
+        repo_id=save_directory,
+        repo_type="model",
+        token=token,
+        )
+        # Remove the file
+        os.remove(file_path)
 
 # Define new custom Model Card
 CUSTOM_MODEL_CARD = """
@@ -141,10 +162,12 @@ language:
 
 # Training Logs
 
-## Summary metrics
-### Best ROUGE-1 score : **{rouge_1_score}**
-### Best ROUGE-2 score : **{rouge_2_score}**
-### Best ROUGE-L score : **{rougeL_score}**
+## Traning metrics
+![Evaluation Loss Plot](eval_loss_plot.png)
+
+## Evaluation score
+{evaluation}
+[Evaluation report and scoring]({eval_file_path})
 
 ## Wandb logs
 You can view the training logs [<img src="https://raw.githubusercontent.com/wandb/wandb/main/docs/README_images/logo-light.svg" width="200"/>]({wandb_run_url}).
@@ -171,5 +194,5 @@ This {model_type} model was trained 2x faster with [Unsloth](https://github.com/
 This {model_type} was trained with [LLM summarizer trainer](images/Llm_Summarizer_trainer_icon-removebg.png)
 [<img src="https://raw.githubusercontent.com/unslothai/unsloth/main/images/unsloth%20made%20with%20love.png" width="200"/>](https://github.com/unslothai/unsloth)
 **LLM summarizer trainer**
-[<img src="images/Llm_Summarizer_trainer_icon-removebg.png" width="150"/>](https://github.com/WillIsback/LLM_Summarizer_Trainer)
+[<img src="https://github.com/WillIsback/LLM_Summarizer_Trainer/blob/main/images/Llm_Summarizer_trainer_icon-removebg.png?raw=true" width="150"/>](https://github.com/WillIsback/LLM_Summarizer_Trainer)
 """

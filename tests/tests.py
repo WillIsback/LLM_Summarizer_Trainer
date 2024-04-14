@@ -1,6 +1,4 @@
-import sys
 from unsloth import FastLanguageModel
-from ChatTemplate import ChatTemplate
 
 def test_dataset(dataset):
     # Check the structure of the dataset
@@ -80,5 +78,5 @@ def test_text_generation(tokenizer, model, message_chat, max_seq_length):
     sample_text = '\n'.join(summary_lines[:10])
     sample = f"\n\nGeneration test, small sample result: \n\n{sample_text}\n\n"
     print(sample)
-    return summary_text, sample
+    return summary_text
 
