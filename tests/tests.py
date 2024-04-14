@@ -63,7 +63,7 @@ def test_text_generation(tokenizer, model, message_chat, max_seq_length):
         max_new_tokens=max_seq_length,
         do_sample=True,
         pad_token_id=tokenizer.pad_token_id,
-        temperature=0.3,
+        temperature=0.7,
         top_k=20,
         top_p=0.95,
         repetition_penalty=1.2,

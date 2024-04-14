@@ -104,46 +104,59 @@ class Unsloth_LLM_Trainer:
         logging.info(f"Weights & Biases run URL: {self.wandb_run_url}")
         logging.info(f"Weights & Biases run path: {self.wandb_run_path}")
 
-    def generate_summary(self, messages, temperature=0.7, top_k=20, top_p=0.95, repetition_penalty=1.2):
-        try:
-            # Check if the model is in training mode
-            if self.model.training:
-                # If it's in training mode, switch it to inference mode
-                FastLanguageModel.for_inference(self.model)
-            # check if the input token length is less than the max_seq_length, if it is set truncation to True
-            truncation = check_token_threshold_and_truncate(
-                self.tokenizer, self.model, messages, self.max_seq_length
-            )
-            # Tokenize the input messages
-            inputs = self.tokenizer.apply_chat_template(
-                messages,
-                tokenize=True,
-                add_generation_prompt=True,  # Must add for generation
-                return_tensors="pt",
-                max_length=self.max_seq_length,
-                truncation=truncation,
-            ).to(device=self.device)
-            # Generate the summary
-            summary_ids = self.model.generate(
-                input_ids=inputs,
-                max_new_tokens=self.max_seq_length,
-                do_sample=True,
-                pad_token_id=self.tokenizer.pad_token_id,
-                temperature=temperature,
-                top_k=top_k,
-                top_p=top_p,
-                repetition_penalty=repetition_penalty,
-            )
-            # Decode the summary
-            summary_text = self.tokenizer.decode(
-                summary_ids[0][inputs.shape[1] :], skip_special_tokens=True
-            )
-            return summary_text
-        except RuntimeError as e:
-            print(f"An error occurred during summary generation: {e}")
-            if "probability tensor contains either `inf`, `nan` or element < 0" in str(e):
-                print("Adjusting parameters and retrying...")
-                return self.generate_summary(messages, temperature=temperature+0.1, top_k=top_k+5, top_p=min(1, top_p+0.05), repetition_penalty=max(1, repetition_penalty-0.1))
+    def generate_summary(self, messages):
+        temperature = 0.7
+        top_k = 20
+        top_p = 0.95
+        repetition_penalty = 1.2
+        for _ in range(10):  # Retry up to 10 times
+            try:
+                # Check if the model is in training mode
+                if self.model.training:
+                    # If it's in training mode, switch it to inference mode
+                    FastLanguageModel.for_inference(self.model)
+                # check if the input token length is less than the max_seq_length, if it is set truncation to True
+                truncation = check_token_threshold_and_truncate(
+                    self.tokenizer, self.model, messages, self.max_seq_length
+                )
+                # Tokenize the input messages
+                inputs = self.tokenizer.apply_chat_template(
+                    messages,
+                    tokenize=True,
+                    add_generation_prompt=True,  # Must add for generation
+                    return_tensors="pt",
+                    max_length=self.max_seq_length,
+                    truncation=truncation,
+                ).to(device=self.device)
+                # Generate the summary
+                summary_ids = self.model.generate(
+                    input_ids=inputs,
+                    max_new_tokens=self.max_seq_length,
+                    do_sample=True,
+                    pad_token_id=self.tokenizer.pad_token_id,
+                    temperature=temperature,
+                    top_k=top_k,
+                    top_p=top_p,
+                    repetition_penalty=repetition_penalty,
+                )
+                # Decode the summary
+                summary_text = self.tokenizer.decode(
+                    summary_ids[0][inputs.shape[1] :], skip_special_tokens=True
+                )
+                return summary_text
+            except RuntimeError as e:
+                print(f"An error occurred during summary generation: {e}")
+                if "probability tensor contains either `inf`, `nan` or element < 0" in str(e):
+                    print("Adjusting parameters and retrying...")
+                    temperature += 0.1
+                    top_k += 5
+                    top_p = min(1, top_p + 0.05)
+                    repetition_penalty = max(1, repetition_penalty - 0.1)
+                else:
+                    print("An error occurred during summary generation.")
+                    return None
+        print("Failed to generate summary after multiple attempts.")
+        return None
 
     def GetOutputModelName(self):
         # Get the base name of the model and use it to name the fine-tuned model

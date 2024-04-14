@@ -59,7 +59,7 @@ class SampleGenerationCallback(TrainerCallback):
         # Moving average smooths out short-term fluctuations and highlights longer-term trends in the Rouge scores.
         scores_df = pd.DataFrame(self.scores_history, columns=['rouge1', 'rouge2', 'rougeL'])
         moving_avg = scores_df.rolling(window=3).mean().values[-1]
-        data = [[i, avg] for i, avg in zip(global_steps, moving_avg)]
+        data = [[global_steps, avg] for avg in moving_avg]
         # Log the moving average as a plot
         table = wandb.Table(data=data, columns=["Step", "Moving Average"])
         wandb.log({"moving_average_plot": wandb.plot.line(table, "Step", "Moving Average", title="Moving Average Plot")})
@@ -70,7 +70,7 @@ class SampleGenerationCallback(TrainerCallback):
         # Exponential smoothing also smooths the scores but gives more weight to recent scores, useful if the model's performance is changing over time.
         scores_df = pd.DataFrame(self.scores_history, columns=['rouge1', 'rouge2', 'rougeL'])
         exp_smoothing = scores_df.ewm(span=3).mean().values[-1]
-        data = [[i, exp] for i, exp in zip(global_steps, exp_smoothing)]
+        data = [[global_steps, exp] for exp in exp_smoothing]
         # Log the exponential smoothing as a plot
         table = wandb.Table(data=data, columns=["Step", "Exponential Smoothing"])
         wandb.log({"exp_smoothing_plot": wandb.plot.line(table, "Step", "Exponential Smoothing", title="Exponential Smoothing Plot")})
@@ -84,7 +84,7 @@ class SampleGenerationCallback(TrainerCallback):
         if len(self.scores_history) > 1:
             derivatives = np.diff(self.scores_history, axis=0)
             avg_derivative = np.mean(derivatives, axis=0)
-        data = [[i, der] for i, der in zip(global_steps, avg_derivative)]
+        data = [[global_steps, der] for der in avg_derivative]
         # Log the derivative as a plot
         table = wandb.Table(data=data, columns=["Step", "Derivative"])
         wandb.log({"derivative_plot": wandb.plot.line(table, "Step", "Derivative", title="Derivative Plot")})
@@ -97,7 +97,7 @@ class SampleGenerationCallback(TrainerCallback):
         if len(self.scores_history) > 2:
             integral = np.trapz(self.scores_history, axis=0)
         # Use global_steps for the x-axis data
-        data = [[step, intg] for step, intg in zip(global_steps, integral)]
+        data = [[global_steps, integ] for integ in integral]
         table = wandb.Table(data=data, columns=["Step", "Integral"])
         wandb.log({"integral_plot": wandb.plot.line(table, "Step", "Integral", title="Integral Plot")})
         return integral
