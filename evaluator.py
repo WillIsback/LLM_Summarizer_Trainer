@@ -108,10 +108,15 @@ class Evaluator:
         )
         return model, tokenizer
     def GetScore(self, instructions, base_summary, fine_tuned_summary):
+        # save the model summary for human evaluation:
+        fine_tuned_name_parts = self.fine_tuned_model_name.split("/")
+        fine_tuned_ext = (
+            fine_tuned_name_parts[-1] if len(fine_tuned_name_parts) > 1 else fine_tuned_name_parts[0]
+        )
         Comparativ_summary = f"""
         ## Reference instruction \n\n{instructions}\n\n
         ## Generated summary with base model {self.base_model_name} \n\n{base_summary}\n\n
-        ## Generated summary with fine tuned model model {self.fine_tuned_model_name} \n\n{fine_tuned_summary}\n\n
+        ## Generated summary with fine tuned model model {fine_tuned_ext} \n\n{fine_tuned_summary}\n\n
         """
         gpt = GPT()
         evaluation = gpt.Evaluate(Comparativ_summary)
@@ -124,11 +129,44 @@ class Evaluator:
         fine_tuned_ext = (
             fine_tuned_name_parts[-1] if len(fine_tuned_name_parts) > 1 else fine_tuned_name_parts[0]
         )
-        Model_evaluator = f"""
+        evaluation_report= EVALUATION_REPORT.format(
+            base_model_name=self.base_model_name,
+            fine_tuned_ext=fine_tuned_ext,
+            instructions=instructions,
+            base_summary=base_summary,
+            fine_tuned_summary=fine_tuned_summary,
+            evaluation=evaluation,
+        )
+
+        eval_file_path = os.path.join(self.eval_dir, f'Model_evaluator-{fine_tuned_ext}.md')
+        with open(eval_file_path, "a") as f:
+            f.write(evaluation_report)
+
+        return eval_file_path
+
+    def evaluate(self, instructions):
+        print("\nEvaluating the fine tuned model and the base model ...\n")
+        fine_tuned_summary = self.GetFineTunedModel_Summary(instructions)
+        base_summary = self.GetBaseModel_Summary(instructions)
+        evaluation = self.GetScore(instructions, base_summary, fine_tuned_summary)
+        eval_file_path = self.WriteEvaluation(instructions, base_summary, fine_tuned_summary, evaluation)
+        model, tokenizer = self.ReloadModel()
+        print(f"\033[1;32m\n\nEvaluation completed check the result: \033[1;34m{eval_file_path}\033[1;32m \n\n\033[0m")
+        return eval_file_path, model, tokenizer, evaluation
+
+    def display(self, eval_file_path):
+        # Read markdown file
+        with open(eval_file_path, 'r') as f:
+            md_content = f.read()
+        # Display markdown in Jupyter notebook
+        display(Markdown(md_content))
+
+
+EVALUATION_REPORT = """
 # Report-Evaluator\n\n
 ## Table of Contents
 - [Reference instruction](#Reference-instruction)
-- [Generated summary with base model {self.base_model_name}](#Generated-summary-with-base-model-{self.base_model_name})
+- [Generated summary with base model {base_model_name}](#Generated-summary-with-base-model-{base_model_name})
 - [Generated summary with fine tuned model {fine_tuned_ext}](#Generated-summary-with-fine-tuned-model-{fine_tuned_ext})
 - [Evaluation](#Evaluation)
 ## Reference instruction
@@ -142,7 +180,7 @@ class Evaluator:
 </details>
 
 ## Generated summary with base model
-### {self.base_model_name}
+### {base_model_name}
 
 <details>
 <summary>View Full base summary</summary>
@@ -168,31 +206,3 @@ class Evaluator:
 ## Evaluation: \n\n{evaluation}\n\n
 
 """
-
-
-
-
-        eval_file_path = os.path.join(self.eval_dir, f'Model_evaluator-{fine_tuned_ext}.md')
-        with open(eval_file_path, "a") as f:
-            f.write(Model_evaluator)
-
-        return eval_file_path
-
-    def evaluate(self, instructions):
-        print("\nEvaluating the fine tuned model and the base model ...\n")
-        fine_tuned_summary = self.GetFineTunedModel_Summary(instructions)
-        base_summary = self.GetBaseModel_Summary(instructions)
-        evaluation = self.GetScore(instructions, base_summary, fine_tuned_summary)
-        eval_file_path = self.WriteEvaluation(instructions, base_summary, fine_tuned_summary, evaluation)
-        model, tokenizer = self.ReloadModel()
-        print(f"\033[1;32m\n\nEvaluation completed check the result: \033[1;34m{eval_file_path}\033[1;32m \n\n\033[0m")
-        return eval_file_path, model, tokenizer, evaluation
-
-    def display(self, eval_file_path):
-        # Read markdown file
-        with open(eval_file_path, 'r') as f:
-            md_content = f.read()
-        # Display markdown in Jupyter notebook
-        display(Markdown(md_content))
-
-
